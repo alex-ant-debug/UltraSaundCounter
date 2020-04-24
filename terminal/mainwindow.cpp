@@ -66,8 +66,14 @@
 #include "QStandardItem"
 
 #define sizeADC_Result  251
-#define numberOfPulses  2
-#define samplingStep    3.76//2.54 мкс.
+#define numberOfPulses  1
+#if numberOfPulses == 2
+#define samplingStep    3.76// мкс.
+#else
+#define samplingStep    2.575// мкс.
+#endif
+
+bool flagClear = true;
 
 //! [0]
 MainWindow::MainWindow(QWidget *parent) :
@@ -314,6 +320,8 @@ void MainWindow::readData()
     {
             y1[0].clear();
             y1[1].clear();
+            x1[0].clear();
+            x1[1].clear();
     }
 #endif
 
@@ -328,11 +336,18 @@ void MainWindow::readData()
     {
         QVector<double> y;
         y = convertChatToShort(data);
-        if((y[0] < 20)&&((flagSignal == 0)||(flagSignal == 2)))//время выборки
+        if(numberOfPulses > 1)
         {
-            y1[flagSignal] = y;
+            if((y[0] < 20)&&((flagSignal == 0)||(flagSignal == 2)))//время выборки
+            {
+                y1[flagSignal] = y;
+            }
+            if((y[0] > 20)&&((flagSignal == 1)||(flagSignal == 3)))//значение АЦП
+            {
+                y1[flagSignal] = y;
+            }
         }
-        if((y[0] > 20)&&((flagSignal == 1)||(flagSignal == 3)))//значение АЦП
+        else
         {
             y1[flagSignal] = y;
         }
@@ -363,15 +378,19 @@ void MainWindow::readData()
     }
 
     #if numberOfPulses == 2
-        if((y1[0].size() >= sizeADC_Result)&&(y1[1].size() >= sizeADC_Result)&&(y1[2].size() >= sizeADC_Result)&&(y1[3].size() >= sizeADC_Result))
+        if((y1[0].size() >= sizeADC_Result)&&\
+           (y1[1].size() >= sizeADC_Result)&&\
+           (y1[2].size() >= sizeADC_Result)&&\
+           (y1[3].size() >= sizeADC_Result))
     #else
-        if((y1[0].size() >= sizeADC_Result)&&(y1[1].size() >= sizeADC_Result))
+        if((y1[0].size() >= sizeADC_Result)&&\
+           (y1[1].size() >= sizeADC_Result))
     #endif
     {
         samplingTimeArray();
         switchBetweenPoints = 0;
         double Time1Value[2];
-        thirdPeakTimeSearch(y1[1], Time1Value);
+        thirdPeakTimeSearch((numberOfPulses>1)?y1[1]:y1[0], Time1Value);
 
 
         QString Time1 = QString::number(Time1Value[0], 'f', 6);    //Время проходжения по потоку
@@ -382,7 +401,7 @@ void MainWindow::readData()
 //------------------------------------------------------------------------------------------------------------------------
         switchBetweenPoints = 1;
         double Time2Value[2];
-        thirdPeakTimeSearch(y1[3], Time2Value);
+        thirdPeakTimeSearch((numberOfPulses>1)?y1[3]:y1[1], Time2Value);
 
 
         QString Time2 = QString::number(Time2Value[0], 'f', 6);    //Время проходжения против потока
@@ -568,6 +587,7 @@ void MainWindow::on_Start_clicked()
         return;
     }
 
+    flagClear = true;
     bool isTextStart = ((m_ui->Start->text()) == "Start");
     QString buttonColor = "color: ";
 
@@ -610,6 +630,7 @@ void MainWindow::on_SaveFile_clicked()
                 {
                     QString newLine = {'\n'};
                     QString tabLine = {'\t'};
+                    #if numberOfPulses == 2
                     QString decY1 = QString::number(y1[0][j]);
                     QString decY2 = QString::number(y1[1][j]);
                     QString decY3 = QString::number(y1[2][j]);
@@ -623,6 +644,15 @@ void MainWindow::on_SaveFile_clicked()
                     decY1 += decY4;
                     decY1 += newLine;
                     stream << decY1;
+                    #else
+                    QString decY1 = QString::number(y1[0][j]);
+                    QString decY2 = QString::number(y1[1][j]);
+
+                    decY1 += tabLine;
+                    decY1 += decY2;
+                    decY1 += newLine;
+                    stream << decY1;
+                    #endif
                 }
                 stream.flush();
                 file.close();
@@ -747,9 +777,9 @@ void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputDat
         }
     }
 
-    qDebug() <<"index = "<< index;
+    //qDebug() <<"index = "<< index;
     index--; //((thirdPeakIndex[0] - 1)<0)? thirdPeakIndex[0]: thirdPeakIndex[0]-1;
-    qDebug() <<"index = "<< index;
+    //qDebug() <<"index = "<< index;
 
 
     while(ADCData.at(index) > average)            // find the transition through zero 3 peak
@@ -757,7 +787,7 @@ void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputDat
         index--;
     }
 
-    qDebug() <<"index = "<< index;
+    //qDebug() <<"index = "<< index;
 
     float pointA = (index < memorySize)&&(index > 0)? ADCData.at(index)   : 0;                //pointA ниже нулевой линии
     float pointB = (index < memorySize)&&(index > 0)? ADCData.at(index+1) : 0;              //pointB выше нулевой линии
@@ -830,7 +860,7 @@ void MainWindow::plotting(void)
 
     //И перерисуем график на нашем signal
     m_ui->signal->replot();
-    colorPoint(0, Qt::green, graph1, graph2);//точки слежения за переходом через ноль
+    //colorPoint(0, Qt::green, graph1, graph2);//точки слежения за переходом через ноль
 }
 
 void MainWindow::passTimeAndZero(void)
@@ -930,23 +960,28 @@ void  MainWindow::calculationOfAverageConsumption(void)
 
 void MainWindow::clear(void)
 {
-    x1[0].clear();
-    x1[1].clear();
-    x3.clear();
-    y1[0].clear();
-    y1[1].clear();
-    y1[2].clear();
-    y1[3].clear();
-    flightTimeDifference[0].clear();
-    flightTimeDifference[1].clear();
-    flagSignal = 0;
-//    m_ui->travelTime->clearGraphs();
-//    m_ui->signal->clearGraphs();
-    //m_ui->signal->replot();
-    //m_ui->travelTime->replot();
-    //m_ui->signal->clearGraphs();//graph1 = 0;
-    plotting();
-    passTimeAndZero();
+    if(flagClear)
+    {
+        x1[0].clear();
+        x1[1].clear();
+        x3.clear();
+        y1[0].clear();
+        y1[1].clear();
+        y1[2].clear();
+        y1[3].clear();
+        flightTimeDifference[0].clear();
+        flightTimeDifference[1].clear();
+        flagSignal = 0;
+    //    m_ui->travelTime->clearGraphs();
+    //    m_ui->signal->clearGraphs();
+        //m_ui->signal->replot();
+        //m_ui->travelTime->replot();
+        //m_ui->signal->clearGraphs();//graph1 = 0;
+        plotting();
+        passTimeAndZero();
+        m_serial->write("Clean\n\r", 7);//
+        flagClear = false;
+    }
 }
 
 
@@ -1048,21 +1083,36 @@ double MainWindow::calculationTimeThirdPeakOther(float pointA, float pointB, uns
 void MainWindow::samplingTimeArray(void)
 {
  //-----------------------------------Время выборки  сигнала-------------------------------------------
-    for(unsigned int n = 0; n < 2; n++)
+    if(numberOfPulses > 1)
     {
-        int sizeY1 = y1[n*2].size();
-
-        for(int x = 0; x < sizeY1; x++)
+        for(unsigned int n = 0; n < 2; n++)
         {
-            x1[n].push_back( ((y1[n*2].at(x)<10)&&(y1[n*2].at(x) != 0)&&(y1[n*2].at(x)<20)) ? (20-y1[n*2].at(x)) : y1[n*2].at(x));
+            int sizeY1 = y1[n*2].size();
+
+            for(int x = 0; x < sizeY1; x++)
+            {
+                x1[n].push_back( ((y1[n*2].at(x)<10)&&(y1[n*2].at(x) != 0)&&(y1[n*2].at(x)<20)) ? (20-y1[n*2].at(x)) : y1[n*2].at(x));
+            }
+
+            double data = 0;
+            int sizeX1 = x1[n].size();
+            for(int x = 0; x < sizeX1; x++)
+            {
+                data += x1[n][x];
+                x1[n][x] = data*0.2685;                 //сложение и умножение на коэффициент
+            }
         }
-
-        double data = 0;
-        int sizeX1 = x1[n].size();
-        for(int x = 0; x < sizeX1; x++)
+    }
+    else
+    {
+        for(unsigned int n = 0; n < 2; n++)
         {
-            data += x1[n][x];
-            x1[n][x] = data*0.2685;                 //сложение и умножение на коэффициент
+            int sizeY1 = y1[n].size();
+
+            for(int x = 0; x < sizeY1; x++)
+            {
+                x1[n].push_back(x*2.575);
+            }
         }
     }
 }
@@ -1085,8 +1135,8 @@ QVector<double> MainWindow::convertChatToShort(QByteArray data)
 void MainWindow::replotGraf(void)
 {
     //--------------------------------- Обновляем данные о сигнале ---------------------------------
-    graph1->setData(x1[0], y1[1], 1);
-    graph2->setData(x1[1], y1[3], 1);
+    graph1->setData(x1[0], (numberOfPulses>1)? y1[1]: y1[0], 1);
+    graph2->setData(x1[1], (numberOfPulses>1)? y1[3]: y1[1], 1);
     m_ui->signal->yAxis->setRange(m_ui->spinBox_Y1->value(), m_ui->spinBox_Y2->value());
     m_ui->signal->xAxis->setRange(m_ui->spinBox_X1->value(), m_ui->spinBox_X2->value());
     m_ui->signal->replot();
@@ -1117,31 +1167,31 @@ void MainWindow::replotGraf(void)
         m_ui->travelTime->replot();
     }
     //--------------------------------- Первая точка перехода через ноль ---------------------------------
-    QString indexPoint1 = m_ui->Period_3->text();
-    indexPoint1.truncate(indexPoint1.lastIndexOf(QChar('(')));
-    std::string str1 = indexPoint1.toStdString();
-    char *indexString1 = &str1[11];
-    double index1 = std::stod(indexString1);
+//    QString indexPoint1 = m_ui->Period_3->text();
+//    indexPoint1.truncate(indexPoint1.lastIndexOf(QChar('(')));
+//    std::string str1 = indexPoint1.toStdString();
+//    char *indexString1 = &str1[11];
+//    double index1 = std::stod(indexString1);
 
-    firstPointTracer->setGraphKey(index1);
-    firstPointTracer->updatePosition();
+//    firstPointTracer->setGraphKey(index1);
+//    firstPointTracer->updatePosition();
 
-    //--------------------------------- Вторая точка перехода через ноль ---------------------------------
-    QString indexPoint2 = m_ui->Period_4->text();
-    indexPoint2.truncate(indexPoint2.lastIndexOf(QChar('(')));
-    std::string str2 = indexPoint2.toStdString();
-    char *indexString2 = &str2[11];
-    double index2 = std::stod(indexString2);
+//    //--------------------------------- Вторая точка перехода через ноль ---------------------------------
+//    QString indexPoint2 = m_ui->Period_4->text();
+//    indexPoint2.truncate(indexPoint2.lastIndexOf(QChar('(')));
+//    std::string str2 = indexPoint2.toStdString();
+//    char *indexString2 = &str2[11];
+//    double index2 = std::stod(indexString2);
 
-    secondPointTracer->setGraphKey(index2);
-    secondPointTracer->updatePosition();
+//    secondPointTracer->setGraphKey(index2);
+//    secondPointTracer->updatePosition();
 
     //--------------------------------- Добавляем линию "нуля" ---------------------------------
-    QString zeroText = m_ui->zero->text();
-    str1 = zeroText.toStdString();
-    char *zeroString = &str1[7];
-    unsigned int zeroVolue = std::stoi(zeroString);
-    addZeroLine(zeroVolue);
+//    QString zeroText = m_ui->zero->text();
+//    str1 = zeroText.toStdString();
+//    char *zeroString = &str1[7];
+//    unsigned int zeroVolue = std::stoi(zeroString);
+    addZeroLine(536);//zeroVolue
     //----------------------------------------------------------------------------------
     //И перерисуем график
     m_ui->signal->replot();
