@@ -65,10 +65,10 @@
 #include "QStandardItemModel"
 #include "QStandardItem"
 
-#define sizeADC_Result  251
-#define numberOfPulses  1
+#define sizeADC_Result  450//251
+#define numberOfPulses  2
 #if numberOfPulses == 2
-#define samplingStep    3.76// мкс.
+#define samplingStep    1.12//3.76// мкс.
 #else
 #define samplingStep    2.575// мкс.
 #endif
@@ -171,13 +171,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     m_ui->spinBox_X1->setRange(0,  1290);
     m_ui->spinBox_X2->setRange(10, 1300);
-    m_ui->spinBox_Y1->setRange(0,   900);
-    m_ui->spinBox_Y2->setRange(10, 1023);
+    m_ui->spinBox_Y1->setRange(0,  4000);
+    m_ui->spinBox_Y2->setRange(10, 4023);
 
-    m_ui->spinBox_X1->setValue(340);
-    m_ui->spinBox_X2->setValue(440);
-    m_ui->spinBox_Y1->setValue(300);
-    m_ui->spinBox_Y2->setValue(800);
+    m_ui->spinBox_X1->setValue(0);
+    m_ui->spinBox_X2->setValue(500);
+    m_ui->spinBox_Y1->setValue(0);
+    m_ui->spinBox_Y2->setValue(4000);
 
 
     m_ui->spinBox_X3->setRange(0, 390000);
@@ -301,13 +301,15 @@ void MainWindow::readData()
 {
 
 #if numberOfPulses == 2
-    if((y1[0].size() >= sizeADC_Result)&&\
-       (y1[1].size() >= sizeADC_Result)&&\
-       (y1[2].size() >= sizeADC_Result)&&\
-       (y1[3].size() >= sizeADC_Result)&&\
-       (x1[0].size() >= sizeADC_Result)&&\
-       (x1[1].size() >= sizeADC_Result))
+    if((y1[0].size() >= sizeADC_Result/2)&&\
+       (y1[1].size() >= sizeADC_Result/2)&&\
+       (y1[2].size() >= sizeADC_Result/2)&&\
+       (y1[3].size() >= sizeADC_Result/2)&&\
+       (x1[0].size() >= sizeADC_Result/2)&&\
+       (x1[1].size() >= sizeADC_Result/2))
     {
+        ySignal[0].clear();
+        ySignal[1].clear();
             y1[0].clear();
             y1[1].clear();
             y1[2].clear();
@@ -316,7 +318,7 @@ void MainWindow::readData()
             x1[1].clear();
     }
 #else
-    if((y1[0].size() >= sizeADC_Result)&&(y1[1].size() >= sizeADC_Result))
+    if((y1[0].size() >= sizeADC_Result*2)&&(y1[1].size() >= sizeADC_Result*2))
     {
             y1[0].clear();
             y1[1].clear();
@@ -336,24 +338,24 @@ void MainWindow::readData()
     {
         QVector<double> y;
         y = convertChatToShort(data);
-        if(numberOfPulses > 1)
-        {
-            if((y[0] < 20)&&((flagSignal == 0)||(flagSignal == 2)))//время выборки
-            {
-                y1[flagSignal] = y;
-            }
-            if((y[0] > 20)&&((flagSignal == 1)||(flagSignal == 3)))//значение АЦП
-            {
-                y1[flagSignal] = y;
-            }
-        }
-        else
+//        if(numberOfPulses > 1)
+//        {
+//            if((y[0] < 20)&&((flagSignal == 0)||(flagSignal == 2)))//время выборки
+//            {
+//                y1[flagSignal] = y;
+//            }
+//            if((y[0] > 20)&&((flagSignal == 1)||(flagSignal == 3)))//значение АЦП
+//            {
+//                y1[flagSignal] = y;
+//            }
+//        }
+//        else
         {
             y1[flagSignal] = y;
         }
 
 
-       if(y1[flagSignal].size() >= sizeADC_Result)
+       if(y1[flagSignal].size() >= sizeADC_Result/2)
        {
         #if numberOfPulses == 2
            if(flagSignal < 4)
@@ -378,20 +380,38 @@ void MainWindow::readData()
     }
 
     #if numberOfPulses == 2
-        if((y1[0].size() >= sizeADC_Result)&&\
-           (y1[1].size() >= sizeADC_Result)&&\
-           (y1[2].size() >= sizeADC_Result)&&\
-           (y1[3].size() >= sizeADC_Result))
+        if((y1[0].size() >= sizeADC_Result/2)&&\
+           (y1[1].size() >= sizeADC_Result/2)&&\
+           (y1[2].size() >= sizeADC_Result/2)&&\
+           (y1[3].size() >= sizeADC_Result/2))
     #else
-        if((y1[0].size() >= sizeADC_Result)&&\
-           (y1[1].size() >= sizeADC_Result))
+        if((y1[0].size() >= sizeADC_Result*2)&&\
+           (y1[1].size() >= sizeADC_Result*2))
     #endif
     {
+
+        for(unsigned int count = 0; count < 225; count++)
+        {
+            ySignal[0].push_back(y1[1][count]);
+        }
+        for(unsigned int count = 0; count < 225; count++)
+        {
+            ySignal[0].push_back(y1[0][count]);
+        }
+        for(unsigned int count = 0; count < 225; count++)
+        {
+            ySignal[1].push_back(y1[3][count]);
+        }
+        for(unsigned int count = 0; count < 225; count++)
+        {
+            ySignal[1].push_back(y1[2][count]);
+        }
+
         samplingTimeArray();
         switchBetweenPoints = 0;
         double Time1Value[2];
-        thirdPeakTimeSearch((numberOfPulses>1)?y1[1]:y1[0], Time1Value);
-
+        //thirdPeakTimeSearch((numberOfPulses>1)?y1[1]:y1[0], Time1Value);
+        thirdPeakTimeSearch(ySignal[0], Time1Value);
 
         QString Time1 = QString::number(Time1Value[0], 'f', 6);    //Время проходжения по потоку
         m_ui->Period_1->setText("t1_изм = " + Time1 + "(мкс)");
@@ -401,8 +421,8 @@ void MainWindow::readData()
 //------------------------------------------------------------------------------------------------------------------------
         switchBetweenPoints = 1;
         double Time2Value[2];
-        thirdPeakTimeSearch((numberOfPulses>1)?y1[3]:y1[1], Time2Value);
-
+        //thirdPeakTimeSearch((numberOfPulses>1)?y1[3]:y1[1], Time2Value);
+        thirdPeakTimeSearch(ySignal[1], Time2Value);
 
         QString Time2 = QString::number(Time2Value[0], 'f', 6);    //Время проходжения против потока
         m_ui->Period_2->setText("t2_изм = " + Time2 + "(мкс)");
@@ -662,14 +682,15 @@ void MainWindow::on_SaveFile_clicked()
 
 unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int size, unsigned int* points)
 {
-  unsigned int min = 1024, max = 0;
-  double valueAndQuantityPoints[20] = {0};
+  unsigned int min = 4096, max = 0;
+  unsigned int rangePointZero = 30;
+  double valueAndQuantityPoints[rangePointZero] = {0};
   unsigned short rangePoints = 0;                                                       //range points
   unsigned int j;
   unsigned int count = 0, threshold = 10;
   unsigned int midpoint = 0;
   unsigned sumPoints = 0;
-  unsigned int straightRun = 5;            //прямой ход сигнала по металлу
+  unsigned int straightRun = 100;//5;            //прямой ход сигнала по металлу
 
   if(size > ADCData.size())
   {
@@ -695,14 +716,14 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
   //------------------------count the quantity of identical points-------------------
   rangePoints = max - min;
 
-  if(rangePoints < 20)
+  if(rangePoints < rangePointZero)
   {
     for(j=straightRun;j<size;j++)
     {
       valueAndQuantityPoints[(int)(max - ADCData.at(j))] += 1;
     }
     //-------------------------------------------------------------------------------
-    for(j=0;j<20;j++)
+    for(j=0;j<30;j++)
     {
       if(*(valueAndQuantityPoints+j) > threshold)
       {
@@ -734,7 +755,7 @@ void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputDat
 
     if(!switchBetweenPoints)
     {
-        zeroLineSearch(ADCData, 80, rangeLine);
+        zeroLineSearch(ADCData, 220, rangeLine);
     }
     max = rangeLine[0] + noiseFigure;                           //max zero interference
     average = rangeLine[1];                                     //zero
@@ -1083,49 +1104,52 @@ double MainWindow::calculationTimeThirdPeakOther(float pointA, float pointB, uns
 void MainWindow::samplingTimeArray(void)
 {
  //-----------------------------------Время выборки  сигнала-------------------------------------------
-    if(numberOfPulses > 1)
-    {
+//    if(numberOfPulses > 1)
+//    {
+//        for(unsigned int n = 0; n < 2; n++)
+//        {
+//            int sizeY1 = y1[n*2].size();
+
+//            for(int x = 0; x < sizeY1; x++)
+//            {
+//                x1[n].push_back( ((y1[n*2].at(x)<10)&&(y1[n*2].at(x) != 0)&&(y1[n*2].at(x)<20)) ? (20-y1[n*2].at(x)) : y1[n*2].at(x));
+//            }
+
+//            double data = 0;
+//            int sizeX1 = x1[n].size();
+//            for(int x = 0; x < sizeX1; x++)
+//            {
+//                data += x1[n][x];
+//                x1[n][x] = data*0.2685;                 //сложение и умножение на коэффициент
+//            }
+//        }
+//    }
+//    else
+//    {
+
+
         for(unsigned int n = 0; n < 2; n++)
         {
-            int sizeY1 = y1[n*2].size();
+            int sizeY1 = ySignal[n].size();
 
             for(int x = 0; x < sizeY1; x++)
             {
-                x1[n].push_back( ((y1[n*2].at(x)<10)&&(y1[n*2].at(x) != 0)&&(y1[n*2].at(x)<20)) ? (20-y1[n*2].at(x)) : y1[n*2].at(x));
-            }
-
-            double data = 0;
-            int sizeX1 = x1[n].size();
-            for(int x = 0; x < sizeX1; x++)
-            {
-                data += x1[n][x];
-                x1[n][x] = data*0.2685;                 //сложение и умножение на коэффициент
+                x1[n].push_back(x*samplingStep);//2.575);
             }
         }
-    }
-    else
-    {
-        for(unsigned int n = 0; n < 2; n++)
-        {
-            int sizeY1 = y1[n].size();
-
-            for(int x = 0; x < sizeY1; x++)
-            {
-                x1[n].push_back(x*2.575);
-            }
-        }
-    }
+//    }
 }
 
 QVector<double> MainWindow::convertChatToShort(QByteArray data)
 {
     QVector<double> y;
     unsigned int sizeData =  data.size();
+    unsigned int sizeSampling = 5000;//1024
 
     for(unsigned int j=0;j<sizeData;j+=2)
     {
         unsigned short dataConvert = (unsigned char)data.at(j)*0x100 + (unsigned char)data.at(j+1);//преобразование char to short
-        unsigned short simbol = (dataConvert < 1024) ? dataConvert : 0 ;//если приняли что-то не то
+        unsigned short simbol = (dataConvert < sizeSampling) ? dataConvert : 0 ;//если приняли что-то не то
         y.push_back(simbol);
     }
 
@@ -1135,8 +1159,8 @@ QVector<double> MainWindow::convertChatToShort(QByteArray data)
 void MainWindow::replotGraf(void)
 {
     //--------------------------------- Обновляем данные о сигнале ---------------------------------
-    graph1->setData(x1[0], (numberOfPulses>1)? y1[1]: y1[0], 1);
-    graph2->setData(x1[1], (numberOfPulses>1)? y1[3]: y1[1], 1);
+    graph1->setData(x1[0], ySignal[0]);//(numberOfPulses>1)? ySignal[0]: y1[0], 1);
+    graph2->setData(x1[1], ySignal[1]);//(numberOfPulses>1)? ySignal[1]: y1[1], 1);
     m_ui->signal->yAxis->setRange(m_ui->spinBox_Y1->value(), m_ui->spinBox_Y2->value());
     m_ui->signal->xAxis->setRange(m_ui->spinBox_X1->value(), m_ui->spinBox_X2->value());
     m_ui->signal->replot();
@@ -1169,7 +1193,7 @@ void MainWindow::replotGraf(void)
     //--------------------------------- Первая точка перехода через ноль ---------------------------------
 //    QString indexPoint1 = m_ui->Period_3->text();
 //    indexPoint1.truncate(indexPoint1.lastIndexOf(QChar('(')));
-//    std::string str1 = indexPoint1.toStdString();
+    std::string str1;// = indexPoint1.toStdString();
 //    char *indexString1 = &str1[11];
 //    double index1 = std::stod(indexString1);
 
@@ -1187,11 +1211,11 @@ void MainWindow::replotGraf(void)
 //    secondPointTracer->updatePosition();
 
     //--------------------------------- Добавляем линию "нуля" ---------------------------------
-//    QString zeroText = m_ui->zero->text();
-//    str1 = zeroText.toStdString();
-//    char *zeroString = &str1[7];
-//    unsigned int zeroVolue = std::stoi(zeroString);
-    addZeroLine(536);//zeroVolue
+    QString zeroText = m_ui->zero->text();
+    str1 = zeroText.toStdString();
+    char *zeroString = &str1[7];
+    unsigned int zeroVolue = std::stoi(zeroString);
+    addZeroLine(zeroVolue);////536//zeroVolue
     //----------------------------------------------------------------------------------
     //И перерисуем график
     m_ui->signal->replot();

@@ -82,7 +82,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-    QVector<double> x1[2], x3, y1[4]; //Массивы координат точек
+    QVector<double> x1[2], x3, y1[4], ySignal[2]; //Массивы координат точек
     #if numberOfPulses > 1
         bool flagSignal;
     #else
