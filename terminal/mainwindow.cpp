@@ -196,7 +196,7 @@ MainWindow::MainWindow(QWidget *parent) :
     m_ui->noisefilter->setValue(0.25);  //значение фильтра по умолчанию
 
     plotting();
-    //colorPoint(0, Qt::darkMagenta, graph1, graph2);//точки слежения за переходом через ноль
+    colorPoint(0, Qt::darkMagenta, graph1, graph2);//точки слежения за переходом через ноль
     passTimeAndZero();
     //-----------------------------------------------------------------------------------------------------------------------------
     connect(m_serial, &QSerialPort::errorOccurred, this, &MainWindow::handleError);
@@ -683,14 +683,14 @@ void MainWindow::on_SaveFile_clicked()
 unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int size, unsigned int* points)
 {
   unsigned int min = 4096, max = 0;
-  unsigned int rangePointZero = 30;
+  unsigned int rangePointZero = 40;
   double valueAndQuantityPoints[rangePointZero] = {0};
   unsigned short rangePoints = 0;                                                       //range points
-  unsigned int j;
+  unsigned int j = 0;
   unsigned int count = 0, threshold = 10;
   unsigned int midpoint = 0;
   unsigned sumPoints = 0;
-  unsigned int straightRun = 100;//5;            //прямой ход сигнала по металлу
+  unsigned int straightRun = 100;//5;            //прямой ход сигнала по металлу, пропускаем 100 точек
 
   if(size > ADCData.size())
   {
@@ -699,7 +699,7 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
   }
 
   //----------------------------search min and max point-----------------------------
-  for(j=straightRun;j<size;j++)
+  for(j = straightRun; j < size; j++)
   {
     if(ADCData.at(j) > max)
     {
@@ -718,14 +718,14 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
 
   if(rangePoints < rangePointZero)
   {
-    for(j=straightRun;j<size;j++)
+    for(j = straightRun; j < size; j++)
     {
-      valueAndQuantityPoints[(int)(max - ADCData.at(j))] += 1;
+      valueAndQuantityPoints[(unsigned int)(max - ADCData.at(j))] += 1;
     }
     //-------------------------------------------------------------------------------
-    for(j=0;j<30;j++)
+    for(j = 0; j < rangePointZero; j++)
     {
-      if(*(valueAndQuantityPoints+j) > threshold)
+      if(*(valueAndQuantityPoints+j) > threshold)//если в масиве больше 10 точек
       {
         sumPoints += ((max - j)*valueAndQuantityPoints[j]);
         count += valueAndQuantityPoints[j];
@@ -747,76 +747,130 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
 
 void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputData[2])
 {
-    unsigned int max, min, countPeak = 2;
+    unsigned int max, min, countPeak = 0;
     unsigned int thirdPeakIndex[3] = {0}, average = 0;
-    const unsigned short noiseFigure = 10;
-    const int memorySize = ADCData.size();
-    int index=0;
+    const unsigned short noiseFigure = 30;
+    const int memorySize = ADCData.size() - 40;
+    short index=0, maxIndex=0;
+    qDebug() <<"thirdPeakTimeSearch";
 
     if(!switchBetweenPoints)
     {
-        zeroLineSearch(ADCData, 220, rangeLine);
+        zeroLineSearch(ADCData, 300, rangeLine);                //поиск нуля до 300-той точки
     }
-    max = rangeLine[0] + noiseFigure;                           //max zero interference
-    average = rangeLine[1];                                     //zero
-    min = rangeLine[2];                                         //min zero interference
-
-    bool flagStartPeak = 0;
-    bool flagEndingPeak = 0;
 
     //-----------------------------find three peak-------------------------------------------
-    for(index = 50; index < memorySize-50; )
+    for(unsigned int  i = 0; i < 3; i++)
     {
-        if(ADCData.at(index) >=  max)                       //find max
-        {
-            max = ADCData.at(index);
-            flagStartPeak = 1;                           	//up
-            flagEndingPeak = 0;
-        }
+        bool flagStartPeak = false;
+        bool flagEndingPeak = false;
+        bool flagPicEnd = false;
 
-        if((flagStartPeak == 1)&&(ADCData.at(index) < max))
-        {
-            flagStartPeak = 0;                           	//doun
-            flagEndingPeak = 1;
-            thirdPeakIndex[countPeak] = index;
-            countPeak--;
-        }
+        max = rangeLine[0] + noiseFigure;                           //max zero interference
+        average = rangeLine[1];                                     //zero
+        min = rangeLine[2];                                         //min zero interference
+        maxIndex=0;
 
-        if((flagStartPeak == 0)&&(flagEndingPeak == 1)&&(ADCData.at(index) < average))
+        for(index = 300; index < memorySize; index++)
         {
-            flagStartPeak = 0;                           	//below zero
-            flagEndingPeak = 0;
-        }
+            if(index < 300)
+            {
+                break;
+            }
 
-        if(countPeak < 3)
-        {
-            index++;
+            if(ADCData.at(index) >  average)                       //данные больше чем "ноль"
+            {
+                //да
+                flagEndingPeak = false;
+                if(ADCData.at(index) >  max)
+                {
+                    max = ADCData.at(index);
+                    flagStartPeak = true;
+                    maxIndex = index;
+                }
+                else
+                {
+                    flagStartPeak = false;
+                    flagEndingPeak = true;
+                }
+            }
+            else
+            {
+                //данные меньше нуля
+                if(ADCData.at(index) <  min)
+                {
+                    min = ADCData.at(index);
+                    if(max > (average + 100))
+                    {
+                        flagPicEnd = true;
+                    }
+                }
+                else
+                {
+                    flagStartPeak = true;
+                    flagEndingPeak = false;
+                    flagPicEnd = false;
+                }
+            }
+
+            if((flagEndingPeak)&&(flagPicEnd))
+            {
+                countPeak++;
+                flagEndingPeak = false;
+                max = rangeLine[0] + noiseFigure;
+            }
+
+            if(countPeak == 2)
+            {
+                break;
+            }
         }
-        else
+        qDebug() <<i;
+        if(maxIndex > 0)
         {
             break;
         }
+        else
+        {
+            qDebug() <<max;
+            qDebug() <<countPeak;
+            maxIndex = index;
+        }
     }
-
+    qDebug() <<"thirdPeakTimeSearch_1";
     //qDebug() <<"index = "<< index;
-    index--; //((thirdPeakIndex[0] - 1)<0)? thirdPeakIndex[0]: thirdPeakIndex[0]-1;
+    //maxIndex--; //((thirdPeakIndex[0] - 1)<0)? thirdPeakIndex[0]: thirdPeakIndex[0]-1;
     //qDebug() <<"index = "<< index;
 
-
-    while(ADCData.at(index) > average)            // find the transition through zero 3 peak
+    qDebug() <<maxIndex;
+    while(ADCData.at(maxIndex) > average)            // find the transition through zero 3 peak
     {
-        index--;
+        maxIndex--;
+        qDebug()<<maxIndex;
     }
+//    for(short ind = maxIndex; ind > 0; ind--)
+//    {
+//        if(ADCData.at(ind) < average)
+//        {
+//            qDebug()<<ind;
+//            maxIndex = ind;
+//            break;
+//        }
+//        else
+//        {
+//            qDebug()<<ind;
+//        }
+//    }
 
     //qDebug() <<"index = "<< index;
 
-    float pointA = (index < memorySize)&&(index > 0)? ADCData.at(index)   : 0;                //pointA ниже нулевой линии
-    float pointB = (index < memorySize)&&(index > 0)? ADCData.at(index+1) : 0;              //pointB выше нулевой линии
+    float pointA = (maxIndex < memorySize)&&(maxIndex > 0)? ADCData.at(maxIndex)   : 0;                //pointA ниже нулевой линии
+    float pointB = (maxIndex < memorySize)&&(maxIndex > 0)? ADCData.at(maxIndex+1) : 0;              //pointB выше нулевой линии
 
-    printPointA_B(index, ADCData);
+    printPointA_B(maxIndex, ADCData);
 
-    outputData[0] = calculationTimeThirdPeak(pointA, pointB, index, average);
-    outputData[1] = calculationTimeThirdPeakOther(pointA, pointB, index, average);
+    outputData[0] = calculationTimeThirdPeak(pointA, pointB, maxIndex, average);
+    outputData[1] = calculationTimeThirdPeakOther(pointA, pointB, maxIndex, average);
 }
 
 
@@ -990,6 +1044,8 @@ void MainWindow::clear(void)
         y1[1].clear();
         y1[2].clear();
         y1[3].clear();
+        ySignal[0].clear();
+        ySignal[1].clear();
         flightTimeDifference[0].clear();
         flightTimeDifference[1].clear();
         flagSignal = 0;
@@ -1191,24 +1247,24 @@ void MainWindow::replotGraf(void)
         m_ui->travelTime->replot();
     }
     //--------------------------------- Первая точка перехода через ноль ---------------------------------
-//    QString indexPoint1 = m_ui->Period_3->text();
-//    indexPoint1.truncate(indexPoint1.lastIndexOf(QChar('(')));
-    std::string str1;// = indexPoint1.toStdString();
-//    char *indexString1 = &str1[11];
-//    double index1 = std::stod(indexString1);
+    QString indexPoint1 = m_ui->Period_3->text();
+    indexPoint1.truncate(indexPoint1.lastIndexOf(QChar('(')));
+    std::string str1 = indexPoint1.toStdString();
+    char *indexString1 = &str1[11];
+    double index1 = std::stod(indexString1);
 
-//    firstPointTracer->setGraphKey(index1);
-//    firstPointTracer->updatePosition();
+    firstPointTracer->setGraphKey(index1);
+    firstPointTracer->updatePosition();
 
-//    //--------------------------------- Вторая точка перехода через ноль ---------------------------------
-//    QString indexPoint2 = m_ui->Period_4->text();
-//    indexPoint2.truncate(indexPoint2.lastIndexOf(QChar('(')));
-//    std::string str2 = indexPoint2.toStdString();
-//    char *indexString2 = &str2[11];
-//    double index2 = std::stod(indexString2);
+    //--------------------------------- Вторая точка перехода через ноль ---------------------------------
+    QString indexPoint2 = m_ui->Period_4->text();
+    indexPoint2.truncate(indexPoint2.lastIndexOf(QChar('(')));
+    std::string str2 = indexPoint2.toStdString();
+    char *indexString2 = &str2[11];
+    double index2 = std::stod(indexString2);
 
-//    secondPointTracer->setGraphKey(index2);
-//    secondPointTracer->updatePosition();
+    secondPointTracer->setGraphKey(index2);
+    secondPointTracer->updatePosition();
 
     //--------------------------------- Добавляем линию "нуля" ---------------------------------
     QString zeroText = m_ui->zero->text();
