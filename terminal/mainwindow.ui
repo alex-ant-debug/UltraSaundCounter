@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>1034</width>
-    <height>723</height>
+    <height>725</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -868,8 +868,8 @@
       <widget class="QLabel" name="DeltaV">
        <property name="geometry">
         <rect>
-         <x>510</x>
-         <y>140</y>
+         <x>480</x>
+         <y>110</y>
          <width>191</width>
          <height>16</height>
         </rect>
@@ -881,8 +881,8 @@
       <widget class="QLabel" name="Vs">
        <property name="geometry">
         <rect>
-         <x>510</x>
-         <y>160</y>
+         <x>480</x>
+         <y>130</y>
          <width>191</width>
          <height>16</height>
         </rect>
@@ -894,9 +894,9 @@
       <widget class="QGroupBox" name="groupBox">
        <property name="geometry">
         <rect>
-         <x>501</x>
+         <x>481</x>
          <y>10</y>
-         <width>261</width>
+         <width>301</width>
          <height>101</height>
         </rect>
        </property>
@@ -951,9 +951,9 @@
       <widget class="QLabel" name="zero">
        <property name="geometry">
         <rect>
-         <x>510</x>
-         <y>110</y>
-         <width>94</width>
+         <x>650</x>
+         <y>150</y>
+         <width>131</width>
          <height>18</height>
         </rect>
        </property>
@@ -1092,6 +1092,24 @@
        </property>
        <property name="text">
         <string>Q = 0.0 (м³/ч)</string>
+       </property>
+      </widget>
+      <widget class="QLabel" name="ZeroData">
+       <property name="geometry">
+        <rect>
+         <x>650</x>
+         <y>170</y>
+         <width>131</width>
+         <height>16</height>
+        </rect>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>zero1=0.0</string>
        </property>
       </widget>
      </widget>

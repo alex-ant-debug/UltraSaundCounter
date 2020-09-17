@@ -299,112 +299,68 @@ void MainWindow::writeData(const QByteArray &data)
 //! [7]
 void MainWindow::readData()
 {
-
-#if numberOfPulses == 2
-    if((y1[0].size() >= sizeADC_Result/2)&&\
-       (y1[1].size() >= sizeADC_Result/2)&&\
-       (y1[2].size() >= sizeADC_Result/2)&&\
-       (y1[3].size() >= sizeADC_Result/2)&&\
-       (x1[0].size() >= sizeADC_Result/2)&&\
-       (x1[1].size() >= sizeADC_Result/2))
-    {
-        ySignal[0].clear();
-        ySignal[1].clear();
-            y1[0].clear();
-            y1[1].clear();
-            y1[2].clear();
-            y1[3].clear();
-            x1[0].clear();
-            x1[1].clear();
-    }
-#else
-    if((y1[0].size() >= sizeADC_Result*2)&&(y1[1].size() >= sizeADC_Result*2))
-    {
-            y1[0].clear();
-            y1[1].clear();
-            x1[0].clear();
-            x1[1].clear();
-    }
-#endif
-
     QByteArray data = m_serial->readAll();
     while(m_serial->waitForReadyRead(1000))
     {
         data += m_serial->readAll();
     }
 
+    unsigned int numberOfCommand = 6;
+    QByteArray  command[numberOfCommand] = {"Sta0", "End0", "Sta1", "End1", "Peel", "Zero"};
 
-    if(flagSignal <= (numberOfPulses+1))//3  заполняем y1 принятыми данными
+    for(unsigned int i = 0; i < numberOfCommand; i++)
     {
-        QVector<double> y;
-        y = convertChatToShort(data);
-//        if(numberOfPulses > 1)
-//        {
-//            if((y[0] < 20)&&((flagSignal == 0)||(flagSignal == 2)))//время выборки
-//            {
-//                y1[flagSignal] = y;
-//            }
-//            if((y[0] > 20)&&((flagSignal == 1)||(flagSignal == 3)))//значение АЦП
-//            {
-//                y1[flagSignal] = y;
-//            }
-//        }
-//        else
+        if(data.contains(command[i]))
         {
-            y1[flagSignal] = y;
+            data.remove(0, 4);
+            switch (i)
+            {
+                case 0: {y1[0] = convertChatToShort(data); break;}//Start 1
+                case 1: {y1[1] = convertChatToShort(data); break;}//End 1
+                case 2: {y1[2] = convertChatToShort(data); break;}//Start 2
+                case 3: {y1[3] = convertChatToShort(data); break;}//End 2
+                case 4: {ySignal[0].clear();        //Clear (Peel)
+                         ySignal[1].clear();
+                         y1[0].clear();
+                         y1[1].clear();
+                         y1[2].clear();
+                         y1[3].clear();
+                         x1[0].clear();
+                         x1[1].clear();
+                         break;}
+                case 5: {unsigned int zeroDataShort = (unsigned int)data[0]*0x100 + (unsigned int)data[1];    //Zero data
+                         QString zeroSignal = QString::number(zeroDataShort, 'f', 0);
+                         m_ui->ZeroData->setText("zero1= " + zeroSignal);
+                         break;}
+                default: break;
+            }
         }
-
-
-       if(y1[flagSignal].size() >= sizeADC_Result/2)
-       {
-        #if numberOfPulses == 2
-           if(flagSignal < 4)
-           {
-               flagSignal++;
-           }
-           if(flagSignal >= 4)
-           {
-               flagSignal = 0;
-           }
-        #else
-          if(flagSignal == 0)
-          {
-              flagSignal = 1;
-          }
-          else if(flagSignal == 1)
-          {
-              flagSignal = 0;
-          }
-        #endif
-       }
     }
 
-    #if numberOfPulses == 2
-        if((y1[0].size() >= sizeADC_Result/2)&&\
-           (y1[1].size() >= sizeADC_Result/2)&&\
-           (y1[2].size() >= sizeADC_Result/2)&&\
-           (y1[3].size() >= sizeADC_Result/2))
-    #else
-        if((y1[0].size() >= sizeADC_Result*2)&&\
-           (y1[1].size() >= sizeADC_Result*2))
-    #endif
+    if((y1[0].size() >= sizeADC_Result/2)&&\
+       (y1[1].size() >= sizeADC_Result/2)&&\
+       (y1[2].size() >= sizeADC_Result/2)&&\
+       (y1[3].size() >= sizeADC_Result/2))
     {
 
-        for(unsigned int count = 0; count < 225; count++)
-        {
-            ySignal[0].push_back(y1[1][count]);
-        }
-        for(unsigned int count = 0; count < 225; count++)
+        for(unsigned int count = 0; count < sizeADC_Result/2; count++)
         {
             ySignal[0].push_back(y1[0][count]);
         }
-        for(unsigned int count = 0; count < 225; count++)
+
+        for(unsigned int count = 0; count < sizeADC_Result/2; count++)
         {
-            ySignal[1].push_back(y1[3][count]);
+            ySignal[0].push_back(y1[1][count]);
         }
-        for(unsigned int count = 0; count < 225; count++)
+
+        for(unsigned int count = 0; count < sizeADC_Result/2; count++)
         {
             ySignal[1].push_back(y1[2][count]);
+        }
+
+        for(unsigned int count = 0; count < sizeADC_Result/2; count++)
+        {
+            ySignal[1].push_back(y1[3][count]);
         }
 
         samplingTimeArray();
@@ -413,7 +369,7 @@ void MainWindow::readData()
         //thirdPeakTimeSearch((numberOfPulses>1)?y1[1]:y1[0], Time1Value);
         thirdPeakTimeSearch(ySignal[0], Time1Value);
 
-        QString Time1 = QString::number(Time1Value[0], 'f', 6);    //Время проходжения по потоку
+        QString Time1 = QString::number(Time1Value[0] - 15, 'f', 6);    //Время проходжения по потоку
         m_ui->Period_1->setText("t1_изм = " + Time1 + "(мкс)");
 
         QString Time1_1 = QString::number(Time1Value[1], 'f', 6);    //Время проходжения по потоку
@@ -424,7 +380,7 @@ void MainWindow::readData()
         //thirdPeakTimeSearch((numberOfPulses>1)?y1[3]:y1[1], Time2Value);
         thirdPeakTimeSearch(ySignal[1], Time2Value);
 
-        QString Time2 = QString::number(Time2Value[0], 'f', 6);    //Время проходжения против потока
+        QString Time2 = QString::number(Time2Value[0]-15, 'f', 6);    //Время проходжения против потока
         m_ui->Period_2->setText("t2_изм = " + Time2 + "(мкс)");
 
         QString Time2_2 = QString::number(Time2Value[1], 'f', 6);    //Время проходжения против потока
@@ -683,7 +639,7 @@ void MainWindow::on_SaveFile_clicked()
 unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int size, unsigned int* points)
 {
   unsigned int min = 4096, max = 0;
-  unsigned int rangePointZero = 40;
+  unsigned int rangePointZero = 50;
   double valueAndQuantityPoints[rangePointZero] = {0};
   unsigned short rangePoints = 0;                                                       //range points
   unsigned int j = 0;
@@ -712,7 +668,7 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
   }
   *(points+0) = max;
   *(points+2) = min;
-
+    qDebug() <<"zeroLineSearch_0";
   //------------------------count the quantity of identical points-------------------
   rangePoints = max - min;
 
@@ -722,6 +678,7 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
     {
       valueAndQuantityPoints[(unsigned int)(max - ADCData.at(j))] += 1;
     }
+    qDebug() <<"zeroLineSearch_1";
     //-------------------------------------------------------------------------------
     for(j = 0; j < rangePointZero; j++)
     {
@@ -731,12 +688,14 @@ unsigned int* MainWindow::zeroLineSearch(QVector <double> ADCData, unsigned int 
         count += valueAndQuantityPoints[j];
       }
     }
+    qDebug() <<"zeroLineSearch_2";
     midpoint = sumPoints/count;
   }
   else
   {
     midpoint = min + rangePoints/2;
   }
+  qDebug() <<"zeroLineSearch_3";
   //---------------------------------------------------------------------------------
   QString zeroSignal = QString::number(midpoint, 'f', 0);
   m_ui->zero->setText("zero = " + zeroSignal);
@@ -750,7 +709,11 @@ void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputDat
     unsigned int max, min, countPeak = 0;
     unsigned int thirdPeakIndex[3] = {0}, average = 0;
     const unsigned short noiseFigure = 30;
-    const int memorySize = ADCData.size() - 40;
+    const int memorySize = (!ADCData.empty())? (ADCData.size() - 40): 0;
+    if(memorySize == 0)
+    {
+        return;
+    }
     short index=0, maxIndex=0;
     qDebug() <<"thirdPeakTimeSearch";
 
@@ -838,9 +801,7 @@ void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputDat
         }
     }
     qDebug() <<"thirdPeakTimeSearch_1";
-    //qDebug() <<"index = "<< index;
-    //maxIndex--; //((thirdPeakIndex[0] - 1)<0)? thirdPeakIndex[0]: thirdPeakIndex[0]-1;
-    //qDebug() <<"index = "<< index;
+
 
     qDebug() <<maxIndex;
     while(ADCData.at(maxIndex) > average)            // find the transition through zero 3 peak
@@ -848,21 +809,6 @@ void MainWindow::thirdPeakTimeSearch(QVector <double> ADCData,  double outputDat
         maxIndex--;
         qDebug()<<maxIndex;
     }
-//    for(short ind = maxIndex; ind > 0; ind--)
-//    {
-//        if(ADCData.at(ind) < average)
-//        {
-//            qDebug()<<ind;
-//            maxIndex = ind;
-//            break;
-//        }
-//        else
-//        {
-//            qDebug()<<ind;
-//        }
-//    }
-
-    //qDebug() <<"index = "<< index;
 
     float pointA = (maxIndex < memorySize)&&(maxIndex > 0)? ADCData.at(maxIndex)   : 0;                //pointA ниже нулевой линии
     float pointB = (maxIndex < memorySize)&&(maxIndex > 0)? ADCData.at(maxIndex+1) : 0;              //pointB выше нулевой линии
@@ -1200,9 +1146,9 @@ QVector<double> MainWindow::convertChatToShort(QByteArray data)
 {
     QVector<double> y;
     unsigned int sizeData =  data.size();
-    unsigned int sizeSampling = 5000;//1024
+    unsigned int sizeSampling = 4096;//1024
 
-    for(unsigned int j=0;j<sizeData;j+=2)
+    for(unsigned int j = 0; j < sizeData; j += 2)
     {
         unsigned short dataConvert = (unsigned char)data.at(j)*0x100 + (unsigned char)data.at(j+1);//преобразование char to short
         unsigned short simbol = (dataConvert < sizeSampling) ? dataConvert : 0 ;//если приняли что-то не то
